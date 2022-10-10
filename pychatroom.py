@@ -26,11 +26,22 @@ index_html = '''
 </head>
 <body>
 <div class='container'>
-<h4>当前聊天室: {{ _path }}</h4>
+<div id='header'>
+	<h4>说明：你可以在网址后面加任意字符进入任意房间，例如加上"cybersecurity"变成"http://xxxx.com:5000/cybersecurity"</h4>
+	<h4>你也可以什么都不做，就在大厅聊天</h4>
+	<h3>当前聊天室: {{ _path }}</h3>
+</div>
 
-<input id="text" value="">
- <input type="submit" value="send" onclick="start()">
- <input type="submit" value="close" onclick="close()">
+<hr/>
+
+<div id="chat">
+	<input id="text" value="">
+	<input type="submit" value="send" onclick="start()">
+	<input type="submit" value="close" onclick="close()">
+</div>
+
+<hr/>
+	
 <div id="msg"></div>
 
 </div>
@@ -47,6 +58,8 @@ index_html = '''
 
 3：连接已关闭或无法打开
 */
+	// 获取用户输入名字
+	var uname = prompt("请输入你的昵称", "");
 
     //创建一个webSocket 实例
     var url = window.location.host.split(':');     // 获取当前路径
@@ -79,16 +92,18 @@ index_html = '''
 
     function onOpen(event){
         console.log("open:"+sockState());
-        document.getElementById("msg").innerHTML = "<p>Connect to Service</p>";
-        document.getElementById("msg").innerHTML += '<p>连接到: '+_url+'</p>';
+        // document.getElementById("msg").innerHTML = "<p>Connect to Service</p>";
+        // document.getElementById("msg").innerHTML += '<p>连接到: '+_url+'</p>';
+        // 发送登录消息
+        webSocket.send(uname);
     };
     function onMessage(event){
-        console.log("onMessage");
-        document.getElementById("msg").innerHTML += "<p>response: "+event.data+"</p>"
+        console.log("onMessage"+event.data);
+        document.getElementById("msg").innerHTML += "<p>"+event.data+"</p>"
     };
 
     function onClose(event){
-        document.getElementById("msg").innerHTML = "<p>close</p>";
+        document.getElementById("msg").innerHTML += "<p>断开连接，如要重新进入，请刷新界面</p>";
         console.log("close: "+sockState());
         webSocket.close();
     }
@@ -138,7 +153,10 @@ class WebsocketChatServer():
 
 	# 处理消息用的handle
 	async def handler(self, websocket, path):
-		print(f'\n进入房间：{path}')   # 当前房间路径
+		uname = await websocket.recv()   # 等待获取用户名
+		
+		# 进入房间
+		print(f'\n用户:{uname} 进入房间：{path}')   # 当前房间路径
 		if path in self.conn:
 			self.conn[path].append(websocket)   # 添加当前连接
 		else:
@@ -151,15 +169,19 @@ class WebsocketChatServer():
 				msg = await websocket.recv()
 				# 分发消息给房间里的用户
 				for conn in self.conn[path]:
-					await conn.send(msg)
+					await conn.send(f'{uname}: {msg}')
 			except websockets.ConnectionClosedOK:
+				break
+			except websockets.ConnectionClosedError:
 				break
 			print(f"recv: {msg}")
 			
 		self.conn[path].remove(websocket)  # 移除连接
 		# 判断房间有没有人
-		for room in self.conn:
-			if self.
+		_conn = dict(self.conn)  # 复制一个副本
+		for room in _conn:
+			if len(_conn[room]) == 0:   # 房间没人了，销毁房间
+				self.conn.pop(room)
 		print(self.conn)
 		print('  > close a connection')
 
